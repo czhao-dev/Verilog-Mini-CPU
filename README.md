@@ -1,80 +1,170 @@
-# Mini 4-bit ALU-Based CPU in Verilog
+# Verilog Mini CPU
 
-This is a modular Verilog hardware design project that implements a simplified, CPU-like system using a 4-bit Arithmetic Logic Unit (ALU), a two-register register file, and a control unit.
+A compact 4-bit educational CPU written in Verilog. The design includes a register file, ALU, control unit, program counter, instruction memory, ALU flags, waveform generation, and self-checking testbenches.
 
+This project is intentionally small enough to study in one sitting while still demonstrating the structure of a real hardware-design workflow: modular RTL, instruction decode, simulation, verification, and reproducible builds.
 
-## System Overview
+## Architecture
 
-This system mimics the basic structure of a tiny processor. It performs ALU operations based on instructions provided via an `opcode`, using data stored in two 4-bit registers.
+```mermaid
+flowchart LR
+    PC["Program Counter"] --> IMEM["Instruction Memory"]
+    IMEM --> CU["Control Unit"]
+    CU --> RF["4 x 4-bit Register File"]
+    RF --> ALU["4-bit ALU"]
+    CU --> ALU
+    ALU --> FLAGS["Flags: zero, negative, carry, overflow"]
+    ALU --> RF
+```
 
-### Key Modules
+The CPU executes one instruction per clock when `run_enable` is high:
 
-| Module          | Description |
-|-----------------|-------------|
-| `alu.v`         | Performs arithmetic and logic operations like ADD, SUB, AND, OR, XOR, shifts, and SLT. |
-| `register_file.v` | Contains two 4-bit registers (A and B) for source operands. |
-| `control_unit.v` | Decodes the 3-bit `opcode` and maps it to the appropriate ALU operation. |
-| `top.v`         | Top-level module connecting all components into a working datapath. |
-| `top_tb.v`      | Testbench to simulate the complete design and visualize behavior with waveform tools. |
+1. `pc` selects a 16-bit instruction from instruction memory.
+2. The control unit decodes opcode, destination register, source registers, and immediate mode.
+3. The register file provides operands.
+4. The ALU computes the result and flags.
+5. The result is written back to the destination register.
+6. The program counter increments.
 
+## Instruction Format
 
-## Supported ALU Operations
+Each instruction is 16 bits:
 
-| Opcode | Operation     | Description              |
-|--------|---------------|--------------------------|
-| `000`  | ADD           | Adds A and B             |
-| `001`  | SUB           | Subtracts B from A       |
-| `010`  | AND           | Bitwise AND              |
-| `011`  | OR            | Bitwise OR               |
-| `100`  | XOR           | Bitwise XOR              |
-| `101`  | SLL           | Logical left shift (A)   |
-| `110`  | SRL           | Logical right shift (A)  |
-| `111`  | SLT           | Set Less Than (A < B)    |
+| Bits | Field | Description |
+|------|-------|-------------|
+| `[15:13]` | `opcode` | ALU operation |
+| `[12:11]` | `dest` | Destination register |
+| `[10:9]` | `src_a` | First source register |
+| `[8:7]` | `src_b` | Second source register |
+| `[6]` | `use_immediate` | Selects immediate instead of `src_b` |
+| `[5:4]` | reserved | Reserved for future control bits |
+| `[3:0]` | `immediate` | 4-bit immediate operand |
 
+## ALU Operations
+
+| Opcode | Operation | Description |
+|--------|-----------|-------------|
+| `000` | `ADD` | `A + B` |
+| `001` | `SUB` | `A - B` |
+| `010` | `AND` | Bitwise AND |
+| `011` | `OR` | Bitwise OR |
+| `100` | `XOR` | Bitwise XOR |
+| `101` | `SLL` | Logical left shift by `B[1:0]` |
+| `110` | `SRL` | Logical right shift by `B[1:0]` |
+| `111` | `SLT` | Unsigned set-less-than |
+
+The ALU exposes four flags:
+
+| Flag | Meaning |
+|------|---------|
+| `zero` | Result is `0000` |
+| `negative` | Result bit 3 is set |
+| `carry` | ADD carry-out, SUB borrow, or shifted-out bit |
+| `overflow` | Signed overflow for ADD/SUB |
 
 ## Project Structure
 
-```
+```text
 .
 ├── src/
 │   ├── alu.v
 │   ├── control_unit.v
+│   ├── instruction_memory.v
 │   ├── register_file.v
-│   ├── top.v
+│   └── top.v
 ├── tb/
+│   ├── alu_tb.v
+│   ├── register_file_tb.v
 │   └── top_tb.v
+├── Makefile
 ├── README.md
-└── Makefile
+└── LICENSE
 ```
 
-## Simulation Instructions
+## Verification
+
+The test suite uses self-checking Verilog testbenches:
+
+| Testbench | Coverage |
+|-----------|----------|
+| `alu_tb.v` | ALU operations and flags |
+| `register_file_tb.v` | Reset, writes, and asynchronous reads |
+| `top_tb.v` | Instruction loading, register loading, PC stepping, ALU execution, and writeback |
+
+The full-system test loads this short program:
+
+```text
+R2 = R0 + R1
+R3 = R0 - R1
+R2 = R2 & 8
+R2 = R2 << 1
+R3 = R0 < R1
+```
+
+## Running the Project
 
 ### Prerequisites
 
-Make sure the following tools are installed:
+- [Icarus Verilog](https://steveicarus.github.io/iverilog/)
+- [GTKWave](https://gtkwave.sourceforge.net/) for waveform inspection
 
-- [Icarus Verilog](http://iverilog.icarus.com/) — for compiling Verilog code
-- [GTKWave](http://gtkwave.sourceforge.net/) — for viewing simulation waveforms
-
-### Run Simulation
+### Run all tests
 
 ```bash
-make
+make test
 ```
-### Demo
+
+Expected output:
+
+```text
+alu_tb: PASS
+register_file_tb: PASS
+top_tb: PASS
+```
+
+### Run individual tests
 
 ```bash
+make test-alu
+make test-register-file
+make test-top
+```
+
+### View waveforms
+
+The top-level testbench writes `waveform.vcd`.
+
+```bash
+make test-top
 gtkwave waveform.vcd
 ```
 
+### Clean generated files
+
+```bash
+make clean
+```
+
+## Why This Is Useful
+
+This project demonstrates:
+
+- RTL module decomposition
+- ALU design and flag handling
+- Register-file read/write behavior
+- Instruction decoding
+- Program-counter based execution
+- Simulation-driven verification
+- Make-based reproducible test runs
+
+## Future Improvements
+
+- Add data memory with load/store instructions
+- Add branches and jumps
+- Add a tiny assembler for the 16-bit instruction format
+- Add GitHub Actions CI for `make test`
+- Add waveform screenshots to the README
+
 ## License
 
-This project is open-source under the Apache-2.0 License. Feel free to use, modify, and share.
-
-## Contributing
-
-Pull requests are welcome! If you find bugs or have suggestions for improvement, feel free to open an issue or fork the repository.
-
-## Author
-
-GitHub: @czhao-dev
+Licensed under Apache-2.0. See [LICENSE](LICENSE).
