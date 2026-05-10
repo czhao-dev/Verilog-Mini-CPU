@@ -157,13 +157,6 @@ This project demonstrates:
 - Simulation-driven verification
 - Make-based reproducible test runs
 
-## Future Improvements
-
-- Add data memory with load/store instructions
-- Add branches and jumps
-- Add a tiny assembler for the 16-bit instruction format
-- Add GitHub Actions CI for `make test`
-- Add waveform screenshots to the README
 
 ## License
 
