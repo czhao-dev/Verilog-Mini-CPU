@@ -145,7 +145,7 @@ gtkwave waveform.vcd
 make clean
 ```
 
-## Why This Is Useful
+## Project Highlights
 
 This project demonstrates:
 
